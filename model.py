@@ -15,13 +15,13 @@ class Model():
     elif args.model == 'gru':
       cell_fn = tf.contrib.rnn.GRUCell
     elif args.model == 'lstm':
-      cell_fn = tf.contrib.rnn.BasicLSTMCell
+      cell_fn = tf.nn.rnn_cell.BasicLSTMCell
     else:
       raise Exception("model type not supported: {}".format(args.model))
 
     cell = cell_fn(args.rnn_size, state_is_tuple=False)
 
-    cell = tf.contrib.rnn.MultiRNNCell(
+    cell = tf.nn.rnn_cell.MultiRNNCell(
             [cell] * args.num_layers,
             state_is_tuple=False
         )
@@ -43,17 +43,17 @@ class Model():
       output_w = tf.get_variable("output_w", [args.rnn_size, NOUT])
       output_b = tf.get_variable("output_b", [NOUT])
 
-    inputs = tf.split(axis=1, num_or_size_splits=args.seq_length, value=self.input_data)
+    inputs = tf.split(value=self.input_data, num_split=args.seq_length, split_dim=1)
     inputs = [tf.squeeze(input_, [1]) for input_ in inputs]
 
-    outputs, state_out = tf.contrib.legacy_seq2seq.rnn_decoder(inputs, self.state_in, cell, loop_function=None, scope='rnnlm')
-    output = tf.reshape(tf.concat(axis=1, values=outputs), [-1, args.rnn_size])
+    outputs, state_out = tf.nn.seq2seq.rnn_decoder(inputs, self.state_in, cell, loop_function=None, scope='rnnlm')
+    output = tf.reshape(tf.concat(1, outputs[0]), [-1, args.rnn_size])
     output = tf.nn.xw_plus_b(output, output_w, output_b)
     self.state_out = tf.identity(state_out, name='state_out')
 
     # reshape target data so that it is compatible with prediction shape
     flat_target_data = tf.reshape(self.target_data,[-1, 3])
-    [x1_data, x2_data, eos_data] = tf.split(axis=1, num_or_size_splits=3, value=flat_target_data)
+    [x1_data, x2_data, eos_data] = tf.split(value=flat_target_data, num_split=3, split_dim=1)
 
     # long method:
     #flat_target_data = tf.split(1, args.seq_length, self.target_data)
@@ -92,7 +92,7 @@ class Model():
       # ie, eq 18 -> 23 of http://arxiv.org/abs/1308.0850
       z = output
       z_eos = z[:, 0:1]
-      z_pi, z_mu1, z_mu2, z_sigma1, z_sigma2, z_corr = tf.split(axis=1, num_or_size_splits=6, value=z[:, 1:])
+      z_pi, z_mu1, z_mu2, z_sigma1, z_sigma2, z_corr = tf.split(value=z[:, 1:], num_split=6, split_dim=1)
 
       # process output z's into MDN paramters
 
